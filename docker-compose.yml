@@ -1,0 +1,112 @@
+version: '3.8'
+services:
+  zookeeper:
+    image: bitnami/zookeeper:3.8
+    environment:
+      - ALLOW_ANONYMOUS_LOGIN=yes
+    ports: ["2181:2181"]
+    restart: unless-stopped
+
+  kafka:
+    image: bitnami/kafka:3.5
+    environment:
+      - KAFKA_BROKER_ID=1
+      - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
+      - KAFKA_LISTENERS=PLAINTEXT://:9092
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+      - ALLOW_PLAINTEXT_LISTENER=yes
+    ports: ["9092:9092"]
+    depends_on:
+      - zookeeper
+
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: demo_user
+      POSTGRES_PASSWORD: demo_pass
+      POSTGRES_DB: usersdb
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./database.sql:/docker-entrypoint-initdb.d/init.sql
+    ports: ["5432:5432"]
+
+  timescaledb:
+    image: timescale/timescaledb:pg15-latest
+    environment:
+      POSTGRES_USER: ts_user
+      POSTGRES_PASSWORD: ts_pass
+      POSTGRES_DB: eventsdb
+    volumes:
+      - tsdata:/var/lib/postgresql/data
+      - ./TimeScaleDB.sql:/docker-entrypoint-initdb.d/init.sql
+    ports: ["5433:5432"]
+
+  mongo:
+    image: mongo:6
+    ports: ["27017:27017"]
+    volumes:
+      - mongodata:/data/db
+
+  neo4j:
+    image: neo4j:5
+    environment:
+      NEO4J_AUTH: "neo4j/neo4jpass"
+    ports: ["7474:7474","7687:7687"]
+    volumes:
+      - neo4jdata:/data
+
+  redis:
+    image: redis:7
+    ports: ["6379:6379"]
+    volumes:
+      - redisdata:/data
+
+  kafka-connect:
+    image: debezium/connect:2.3
+    environment:
+      BOOTSTRAP_SERVERS: "kafka:9092"
+      GROUP_ID: "connect-cluster"
+      CONFIG_STORAGE_TOPIC: "connect-configs"
+      OFFSET_STORAGE_TOPIC: "connect-offsets"
+      STATUS_STORAGE_TOPIC: "connect-status"
+      KEY_CONVERTER_SCHEMAS_ENABLE: "false"
+      VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
+    ports: ["8083:8083"]
+    depends_on:
+      - kafka
+      - postgres
+    # mounts for connectors/configs can be added
+
+  api:
+    build: ./services/api
+    depends_on:
+      - postgres
+      - mongo
+      - neo4j
+      - kafka
+      - redis
+      - timescaledb
+    ports: ["4000:4000"]
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgres://demo_user:demo_pass@postgres:5432/usersdb
+      MONGO_URL: mongodb://mongo:27017/docsdb
+      NEO4J_URL: bolt://neo4j:7687
+      REDIS_URL: redis://redis:6379
+      KAFKA_BROKER: kafka:9092
+      TIMESCALE_URL: postgres://ts_user:ts_pass@timescaledb:5432/eventsdb
+
+  frontend:
+    build: ./services/frontend
+    ports: ["3000:3000"]
+    depends_on:
+      - api
+    environment:
+      REACT_APP_API_URL: http://localhost:4000
+
+volumes:
+  pgdata:
+  tsdata:
+  mongodata:
+  neo4jdata:
+  redisdata:
