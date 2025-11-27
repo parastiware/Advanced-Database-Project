@@ -1,0 +1,18 @@
+[
+    {
+        "author_id": "uuid-placeholder",
+        "title": "My first post",
+        "body": "This is a sample post content.",
+        "tags": [
+            "welcome",
+            "intro"
+        ],
+        "meta": {
+            "likes": 0,
+            "commentsCount": 0,
+            "visibility": "public"
+        },
+        "createdAt": "2025-11-27T12:00:00Z",
+        "updatedAt": "2025-11-27T12:00:00Z"
+    }
+]
