@@ -1,21 +1,20 @@
-version: '3.8'
 services:
   zookeeper:
-    image: bitnami/zookeeper:3.8
+    image: confluentinc/cp-zookeeper:7.4.0
     environment:
-      - ALLOW_ANONYMOUS_LOGIN=yes
-    ports: ["2181:2181"]
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports: [ "2181:2181" ]
     restart: unless-stopped
 
   kafka:
-    image: bitnami/kafka:3.5
+    image: confluentinc/cp-kafka:7.4.0
     environment:
-      - KAFKA_BROKER_ID=1
-      - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
-      - KAFKA_LISTENERS=PLAINTEXT://:9092
-      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
-      - ALLOW_PLAINTEXT_LISTENER=yes
-    ports: ["9092:9092"]
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    ports: [ "9092:9092" ]
     depends_on:
       - zookeeper
 
@@ -28,10 +27,10 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./database.sql:/docker-entrypoint-initdb.d/init.sql
-    ports: ["5432:5432"]
+    ports: [ "5432:5432" ]
 
   timescaledb:
-    image: timescale/timescaledb:pg15-latest
+    image: timescale/timescaledb:latest-pg15
     environment:
       POSTGRES_USER: ts_user
       POSTGRES_PASSWORD: ts_pass
@@ -39,11 +38,11 @@ services:
     volumes:
       - tsdata:/var/lib/postgresql/data
       - ./TimeScaleDB.sql:/docker-entrypoint-initdb.d/init.sql
-    ports: ["5433:5432"]
+    ports: [ "5433:5432" ]
 
   mongo:
     image: mongo:6
-    ports: ["27017:27017"]
+    ports: [ "27017:27017" ]
     volumes:
       - mongodata:/data/db
 
@@ -51,13 +50,13 @@ services:
     image: neo4j:5
     environment:
       NEO4J_AUTH: "neo4j/neo4jpass"
-    ports: ["7474:7474","7687:7687"]
+    ports: [ "7474:7474", "7687:7687" ]
     volumes:
       - neo4jdata:/data
 
   redis:
     image: redis:7
-    ports: ["6379:6379"]
+    ports: [ "6379:6379" ]
     volumes:
       - redisdata:/data
 
@@ -71,7 +70,7 @@ services:
       STATUS_STORAGE_TOPIC: "connect-status"
       KEY_CONVERTER_SCHEMAS_ENABLE: "false"
       VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
-    ports: ["8083:8083"]
+    ports: [ "8083:8083" ]
     depends_on:
       - kafka
       - postgres
@@ -86,7 +85,7 @@ services:
       - kafka
       - redis
       - timescaledb
-    ports: ["4000:4000"]
+    ports: [ "4000:4000" ]
     environment:
       NODE_ENV: development
       DATABASE_URL: postgres://demo_user:demo_pass@postgres:5432/usersdb
@@ -98,7 +97,7 @@ services:
 
   frontend:
     build: ./services/frontend
-    ports: ["3000:3000"]
+    ports: [ "3000:3000" ]
     depends_on:
       - api
     environment:

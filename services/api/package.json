@@ -1,7 +1,7 @@
 {
-    "name": "api",
+    "name": "polyglot-persistence-api",
     "version": "1.0.0",
-    "description": "Backend API for Polyglot Persistence Demo",
+    "description": "API service for polyglot persistence demo",
     "main": "index.js",
     "scripts": {
         "start": "node index.js",

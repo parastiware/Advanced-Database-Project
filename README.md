@@ -54,25 +54,6 @@ graph TD
 ## Getting Started
 
 ### Prerequisites
-- Docker Desktop installed and running.
-
-### Installation & Run
-
-1.  **Clone the repository** (if applicable).
-2.  **Start the application**:
-    ```bash
-    docker-compose up --build
-    ```
-    This command will:
-    - Build the API and Frontend images.
-    - Start all database containers (Postgres, Mongo, Neo4j, TimescaleDB, Redis).
-    - Start Kafka and Zookeeper.
-    - Initialize databases with provided SQL scripts.
-
-3.  **Access the Services**:
-    - **Frontend UI**: [http://localhost:3000](http://localhost:3000)
-    - **Backend API**: [http://localhost:4000](http://localhost:4000)
-    - **Kafka Connect**: [http://localhost:8083](http://localhost:8083)
 
 ## Data Schemas
 
