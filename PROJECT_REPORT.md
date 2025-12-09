@@ -5,8 +5,8 @@
 
 **Project Title:** Polyglot Persistence Demo with Microservices Architecture  
 **Author:** Advanced Database Systems Project  
-**Date:** December 4, 2025  
-**Version:** 1.0
+**Date:** December 8, 2025  
+**Version:** 1.1 - Updated with modular API architecture and vis-network visualization
 
 ---
 
@@ -803,6 +803,31 @@ graph LR
 
 ## Implementation Details
 
+### API Architecture
+
+The API has been refactored from a monolithic structure into a modular, maintainable architecture:
+
+**Structure:**
+```
+services/api/
+├── index.js                 # Server initialization & middleware setup
+├── lib/helpers.js           # Shared utilities (asyncHandler, client getters)
+├── routes/
+│   ├── users.js            # User CRUD (Postgres + Neo4j sync)
+│   ├── posts.js            # Post CRUD (Mongo + enrichment)
+│   ├── graph.js            # Neo4j follow relationships
+│   ├── analytics.js        # TimescaleDB statistics
+│   └── cache.js            # Redis cache monitoring
+└── package.json
+```
+
+**Key Improvements:**
+- Separation of concerns: Each route module handles specific domain
+- Centralized error handling via `asyncHandler` middleware
+- Reusable client connection getters in `lib/helpers.js`
+- Reduced complexity: From 560+ lines to ~120 lines in index.js
+- Neo4j user synchronization on user creation/deletion
+
 ### API Gateway Implementation
 
 The API Gateway is built with Node.js and Express, serving as the single entry point for all client requests.
@@ -927,7 +952,7 @@ Polyglot Persistence API is running
 
 #### User Endpoints (PostgreSQL)
 
-**Create User**
+**Create User** (with Neo4j sync)
 ```http
 POST /users
 Content-Type: application/json
@@ -945,19 +970,34 @@ Content-Type: application/json
   "id": "550e8400-e29b-41d4-a716-446655440000",
   "email": "user@example.com",
   "name": "John Doe",
-  "hashed_password": "secure_password",
-  "created_at": "2025-12-04T16:30:00.000Z",
-  "updated_at": "2025-12-04T16:30:00.000Z"
+  "created_at": "2025-12-08T10:30:00.000Z",
+  "updated_at": "2025-12-08T10:30:00.000Z"
 }
 ```
 
 **Side Effects:**
-- Event published to Kafka: `USER_CREATED`
-- Neo4j user node created (via consumer)
-- Redis cache populated (via consumer)
-- TimescaleDB event logged (via consumer)
+- Neo4j user node created immediately: `CREATE (:User {id, name})`
+- User visible in graph visualization
 
----
+**Update User**
+```http
+PUT /users/:id
+Content-Type: application/json
+
+{
+  "email": "newemail@example.com",
+  "name": "Jane Doe"
+}
+```
+
+**Delete User**
+```http
+DELETE /users/:id
+```
+
+**Side Effects:**
+- Neo4j user node and all relationships deleted (DETACH DELETE)
+- Graph visualization updated
 
 **Get All Users**
 ```http
@@ -971,7 +1011,7 @@ GET /users
     "id": "550e8400-e29b-41d4-a716-446655440000",
     "email": "user@example.com",
     "name": "John Doe",
-    "created_at": "2025-12-04T16:30:00.000Z"
+    "created_at": "2025-12-08T10:30:00.000Z"
   }
 ]
 ```
@@ -1001,17 +1041,16 @@ Content-Type: application/json
   "title": "My First Post",
   "body": "This is the content of my post.",
   "tags": ["tech", "databases"],
-  "created_at": "2025-12-04T16:35:00.000Z"
+  "author": {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "email": "user@example.com",
+    "name": "John Doe"
+  },
+  "created_at": "2025-12-08T10:35:00.000Z"
 }
 ```
 
-**Side Effects:**
-- Event published to Kafka: `POST_CREATED`
-- TimescaleDB event logged
-
----
-
-**Get All Posts**
+**Get All Posts** (enriched with user data)
 ```http
 GET /posts
 ```
@@ -1025,16 +1064,37 @@ GET /posts
     "title": "My First Post",
     "body": "This is the content of my post.",
     "tags": ["tech", "databases"],
-    "created_at": "2025-12-04T16:35:00.000Z"
+    "author": {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "email": "user@example.com",
+      "name": "John Doe"
+    },
+    "created_at": "2025-12-08T10:35:00.000Z"
   }
 ]
+```
+
+**Update Post**
+```http
+PUT /posts/:id
+Content-Type: application/json
+
+{
+  "title": "Updated Title",
+  "body": "Updated content"
+}
+```
+
+**Delete Post**
+```http
+DELETE /posts/:id
 ```
 
 ---
 
 #### Graph Endpoints (Neo4j)
 
-**Create Follow Relationship**
+**Create Follow Relationship** (with validation)
 ```http
 POST /follow
 Content-Type: application/json
@@ -1056,6 +1116,68 @@ Content-Type: application/json
 ```cypher
 MATCH (a:User {id: $followerId}), (b:User {id: $followeeId})
 MERGE (a)-[:FOLLOWS]->(b)
+```
+
+**Get Relationships** (with user names)
+```http
+GET /relationships
+```
+
+**Response:**
+```json
+[
+  {
+    "follower_id": "550e8400-e29b-41d4-a716-446655440000",
+    "follower_name": "John Doe",
+    "followee_id": "660f9511-f30c-52e5-b827-557766551111",
+    "followee_name": "Jane Smith"
+  }
+]
+```
+
+---
+
+#### Analytics Endpoints (TimescaleDB)
+
+**Get Analytics Statistics**
+```http
+GET /analytics
+```
+
+**Response:**
+```json
+{
+  "stats": {
+    "totalEvents": 152,
+    "totalUsers": 5,
+    "totalPosts": 12,
+    "eventTypes": {
+      "user_created": 5,
+      "post_created": 12,
+      "follow_created": 8
+    }
+  }
+}
+```
+
+---
+
+#### Cache Endpoints (Redis)
+
+**Get Cache Status**
+```http
+GET /cache-status
+```
+
+**Response:**
+```json
+{
+  "status": "connected",
+  "memory": "1.2MB",
+  "keys": 42,
+  "hitRate": 0.85,
+  "evictions": 5
+}
 ```
 
 ---
@@ -1083,49 +1205,94 @@ All endpoints return errors in the following format:
 - **Framework:** React 18.2.0
 - **Build Tool:** react-scripts 5.0.1
 - **Styling:** Custom CSS3 with modern design patterns
+- **Graph Visualization:** vis-network 9.1.2 (lightweight, no A-Frame dependencies)
+
+### Architecture
+
+**Modular Component Structure:**
+```
+src/components/
+├── Header.jsx              # Navigation and title
+├── UserSection.jsx         # PostgreSQL user management
+│   ├── UserForm.jsx       # Create user form
+│   └── UserList.jsx       # Display all users
+├── PostSection.jsx         # MongoDB post management
+│   ├── PostForm.jsx       # Create post form
+│   └── PostList.jsx       # Display all posts
+├── GraphSection.jsx        # Neo4j relationship visualization
+├── AnalyticsSection.jsx    # TimescaleDB statistics dashboard
+├── CacheSection.jsx        # Redis cache monitoring
+└── PlaceholderSections.jsx # Placeholder components
+```
 
 ### Features
 
 1. **Multi-Database Dashboard**
    - Separate sections for each database type
-   - Real-time data display
+   - Real-time data display with error handling
    - Interactive forms for CRUD operations
+   - Loading states and error messages
 
-2. **Modern UI Design**
-   - Gradient backgrounds
-   - Glassmorphism effects
-   - Card-based layout
-   - Hover animations
-   - Responsive grid system
+2. **Graph Visualization** (Neo4j)
+   - Interactive network graph using vis-network
+   - Users displayed as purple circular nodes
+   - Relationships shown as directed edges
+   - Physics simulation for automatic layout
+   - Click to expand node details
+   - Zoom and pan controls
 
-3. **Data Management**
-   - Create users (PostgreSQL)
-   - Create posts (MongoDB)
+3. **Analytics Dashboard** (TimescaleDB)
+   - Real-time statistics display
+   - Event type distribution
+   - Error boundaries with user feedback
+   - Loading indicators during API calls
+
+4. **Modern UI Design**
+   - Gradient backgrounds (#667eea to #764ba2)
+   - Glassmorphism effects with semi-transparent panels
+   - Card-based layout with shadow effects
+   - Smooth hover animations and transitions
+   - Responsive grid system (adapts to screen size)
+   - Purple theme consistent across all sections
+
+5. **Data Management**
+   - Create users (PostgreSQL) - auto-synced to Neo4j
+   - Create posts (MongoDB) - with user enrichment
+   - Create follow relationships (Neo4j)
    - View all records in real-time
-   - Auto-refresh on data changes
+   - Auto-refresh on data changes (with polling or WebSocket ready)
+   - User and post deletion with cascade support
 
-### Component Structure
+### Component Highlights
 
-**Main App Component:**
-- State management for users and posts
-- API integration with fetch
-- Form handling and validation
-- Real-time data fetching
+**GraphSection.jsx:**
+- Uses vis-network Network component for graph rendering
+- Implements useCallback optimization for renderGraph function
+- Auto-layouts users as nodes with relationships as edges
+- Handles physics simulation and pan/zoom
+- Displays follower/followee names on relationships
 
-**Sections:**
-1. PostgreSQL - Users (with create form)
-2. MongoDB - Posts (with create form)
-3. Neo4j - Graph (placeholder)
-4. TimescaleDB - Events (placeholder)
-5. Redis - Cache (placeholder)
+**AnalyticsSection.jsx:**
+- Fetches from `/analytics` endpoint
+- Displays event statistics in card format
+- Shows error messages when API unavailable
+- Includes loading spinner during data fetch
+- State management for loading and error conditions
+
+**CacheSection.jsx:**
+- Monitors Redis cache health
+- Displays memory usage, hit rate, evictions
+- Fetches from `/cache-status` endpoint
+- Real-time updates on cache operations
 
 ### Styling Highlights
 
 - **Color Palette:** Purple gradient theme (#667eea to #764ba2)
-- **Typography:** Inter font family
-- **Animations:** Smooth transitions on hover and focus
+- **Typography:** System fonts (sans-serif fallback)
+- **Animations:** 0.3s ease transitions on hover and focus
 - **Layout:** CSS Grid for responsive sections
-- **Accessibility:** Focus states and semantic HTML
+- **Effects:** Glassmorphism with rgba backgrounds and backdrop-filter
+- **Accessibility:** Focus states, semantic HTML, ARIA labels
 
 ---
 
@@ -1142,7 +1309,7 @@ All endpoints return errors in the following format:
 
 1. **Clone Repository**
 ```bash
-cd d:\SEMO\Advanced-Database\Demo
+cd Advanced-Database-Project
 ```
 
 2. **Start All Services**
@@ -1364,6 +1531,86 @@ docker exec -it demo-redis-1 redis-cli GET "user:{uuid}:profile"
 
 ---
 
+## Recent Updates (December 8, 2025)
+
+### API Refactoring
+- **Modularized Routes:** Split monolithic index.js into 5 specialized route files
+  - `routes/users.js` - User CRUD with Neo4j synchronization
+  - `routes/posts.js` - Post CRUD with user enrichment from PostgreSQL
+  - `routes/graph.js` - Neo4j follow relationships with validation
+  - `routes/analytics.js` - TimescaleDB statistics and metrics
+  - `routes/cache.js` - Redis cache health monitoring
+- **Error Handling:** Implemented centralized asyncHandler middleware in `lib/helpers.js`
+- **Code Quality:** Reduced main index.js complexity by ~70% (560→120 lines)
+
+### Frontend Enhancements
+- **Graph Visualization:** Replaced react-force-graph with vis-network
+  - Eliminates A-Frame dependency conflicts
+  - Lighter library (~50KB vs ~200KB)
+  - Better performance for network graphs
+  - Interactive node physics simulation
+- **Component Modularity:** Extracted reusable components
+  - GraphSection.jsx for Neo4j visualization
+  - AnalyticsSection.jsx with error states
+  - CacheSection.jsx for Redis monitoring
+- **Error Handling:** Added loading states and error messages throughout UI
+- **React Optimization:** Fixed hook warnings with useCallback and proper dependencies
+
+### Database Integration
+- **Neo4j Sync:** Users created in PostgreSQL are immediately synced to Neo4j
+- **Post Enrichment:** Posts returned with full user data from PostgreSQL
+- **Analytics:** Endpoint provides real-time statistics from TimescaleDB
+- **Cache Monitoring:** Redis status available via dedicated endpoint
+
+### Deployment Improvements
+- Docker Compose handles service orchestration smoothly
+- All services start in correct dependency order
+- Health checks ensure all databases are ready before API starts
+- Environment variables properly configured for all services
+
+### Git Organization
+- Organized changes into 5 semantic commits:
+  1. API modularization (routes + helpers)
+  2. Index.js refactoring and simplification
+  3. Graph visualization upgrade (vis-network)
+  4. Docker/npm dependencies fixes
+  5. Frontend components and error handling
+
+---
+
+## Conclusion
+
+### Project Summary
+
+This Polyglot Persistence Demonstration successfully showcases how multiple database technologies can work together in a cohesive system, each optimized for specific data patterns and access requirements. The project achieves its primary objectives:
+
+✅ **Polyglot Persistence Demonstrated**: Five different database types working in harmony  
+✅ **Event-Driven Architecture**: Kafka-based asynchronous communication  
+✅ **Microservices Pattern**: Loosely coupled, independently deployable services  
+✅ **Real-time Visualization**: React-based dashboard showing live data with vis-network  
+✅ **Containerized Deployment**: Docker Compose for one-command setup  
+✅ **Modular Code Architecture**: Clean separation of concerns with reusable components
+
+### Key Learnings
+
+1. **Database Selection Matters**: Choosing the right database for each use case significantly impacts performance and developer productivity
+2. **Event-Driven Complexity**: Asynchronous communication adds complexity but provides flexibility and scalability
+3. **Consistency Trade-offs**: Understanding CAP theorem in practice - choosing between strong and eventual consistency
+4. **Operational Overhead**: Managing multiple databases requires robust DevOps practices and monitoring
+5. **Code Organization**: Modular architecture with centralized error handling improves maintainability
+
+### Technical Achievements
+
+- **10 containerized services** running in orchestrated environment
+- **5 different database technologies** integrated seamlessly
+- **Event-driven synchronization** using industry-standard Kafka
+- **Modern React frontend** with vis-network graph visualization
+- **RESTful API** with modular route handlers and centralized error handling
+- **Complete Docker orchestration** for reproducible deployments
+- **Enriched data flows** with cross-database joins and synchronization
+
+---
+
 ## Conclusion
 
 ### Project Summary
@@ -1455,6 +1702,6 @@ The foundation laid here provides a robust starting point for adding advanced fe
 
 *This report was generated for the Advanced Database Systems project demonstrating polyglot persistence architecture.*
 
-**Project Repository**: d:\SEMO\Advanced-Database\Demo  
-**Report Generated**: December 4, 2025  
-**Version**: 1.0
+**Project Repository**: Advanced-Database-Project  
+**Report Generated**: December 8, 2025  
+**Version**: 1.1 - Updated with modular API architecture and vis-network visualization

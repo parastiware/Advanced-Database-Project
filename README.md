@@ -51,9 +51,47 @@ graph TD
 └── README.md               # Project documentation
 ```
 
+## API Endpoints
+
+### User Management
+- `POST /users` - Create user (syncs to Neo4j)
+- `GET /users` - Get all users
+- `PUT /users/:id` - Update user
+- `DELETE /users/:id` - Delete user (cascades in Neo4j)
+
+### Post Management
+- `POST /posts` - Create post
+- `GET /posts` - Get all posts (enriched with user data)
+- `PUT /posts/:id` - Update post
+- `DELETE /posts/:id` - Delete post
+
+### Graph Relationships
+- `POST /follow` - Create follow relationship
+- `GET /relationships` - Get all relationships with user names
+
+### Analytics
+- `GET /analytics` - Get TimescaleDB statistics (events count, types, etc.)
+
+### Cache Monitoring
+- `GET /cache-status` - Get Redis cache status and metrics
+
 ## Getting Started
 
 ### Prerequisites
+- Docker Desktop (with Docker Compose v2.0+)
+- 8GB RAM minimum
+- 10GB free disk space
+
+### Quick Start
+```bash
+cd services/
+docker-compose up -d
+```
+
+Then access:
+- Frontend: http://localhost:3000
+- API: http://localhost:4000
+- Neo4j Browser: http://localhost:7474 (neo4j / neo4jpass)
 
 ## Data Schemas
 
@@ -98,7 +136,12 @@ CREATE TABLE events (
 
 - [x] Docker Compose setup
 - [x] Database initialization scripts
-- [x] Basic Service Structure (API & Frontend)
-- [ ] Full API Implementation
-- [ ] Full Frontend Visualization
-- [ ] Kafka Integration
+- [x] Service Structure (API & Frontend)
+- [x] Full API Implementation with modular route handlers
+- [x] API Modularization (routes/users.js, routes/posts.js, routes/graph.js, routes/analytics.js, routes/cache.js)
+- [x] Centralized error handling with asyncHandler middleware
+- [x] Neo4j user creation sync from PostgreSQL
+- [x] Graph visualization with vis-network
+- [x] Frontend components (GraphSection, AnalyticsSection, CacheSection)
+- [x] Redis cache monitoring endpoints
+- [ ] Full Kafka event consumption integration to TimescaleDB
