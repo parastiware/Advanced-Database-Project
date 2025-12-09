@@ -1,4 +1,5 @@
 {
+    "type": "module",
     "name": "polyglot-persistence-api",
     "version": "1.0.0",
     "description": "API service for polyglot persistence demo",

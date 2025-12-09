@@ -1,6 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
 import './App.css';
+import { Header } from './components/Header';
+import { UserSection } from './components/UserSection';
+import { PostSection } from './components/PostSection';
+import { GraphSection } from './components/GraphSection';
+import { AnalyticsSection } from './components/AnalyticsSection';
+import { CacheSection } from './components/CacheSection';
 
 const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:4000';
 
@@ -9,6 +15,8 @@ function App() {
     const [posts, setPosts] = useState([]);
     const [newUser, setNewUser] = useState({ email: '', name: '', password: '' });
     const [newPost, setNewPost] = useState({ author_id: '', title: '', body: '', tags: '' });
+    const [editingUserId, setEditingUserId] = useState(null);
+    const [editingPostId, setEditingPostId] = useState(null);
 
     useEffect(() => {
         fetchUsers();
@@ -19,7 +27,12 @@ function App() {
         try {
             const res = await fetch(`${API_URL}/users`);
             const data = await res.json();
-            setUsers(data);
+            if (Array.isArray(data)) {
+                setUsers(data);
+            } else {
+                console.warn('/users returned non-array:', data);
+                setUsers([]);
+            }
         } catch (err) {
             console.error('Error fetching users:', err);
         }
@@ -29,7 +42,12 @@ function App() {
         try {
             const res = await fetch(`${API_URL}/posts`);
             const data = await res.json();
-            setPosts(data);
+            if (Array.isArray(data)) {
+                setPosts(data);
+            } else {
+                console.warn('/posts returned non-array:', data);
+                setPosts([]);
+            }
         } catch (err) {
             console.error('Error fetching posts:', err);
         }
@@ -38,135 +56,133 @@ function App() {
     const createUser = async (e) => {
         e.preventDefault();
         try {
-            await fetch(`${API_URL}/users`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(newUser),
-            });
+            if (editingUserId) {
+                // Update user
+                const payload = { email: newUser.email, name: newUser.name, password: newUser.password || null };
+                await fetch(`${API_URL}/users/${editingUserId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                setEditingUserId(null);
+            } else {
+                // Create new user
+                await fetch(`${API_URL}/users`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(newUser),
+                });
+            }
             setNewUser({ email: '', name: '', password: '' });
             fetchUsers();
         } catch (err) {
-            console.error('Error creating user:', err);
+            console.error('Error creating/updating user:', err);
+        }
+    };
+
+    const editUser = (user) => {
+        setNewUser({ email: user.email, name: user.name, password: '' });
+        setEditingUserId(user.id);
+    };
+
+    const cancelEditUser = () => {
+        setEditingUserId(null);
+        setNewUser({ email: '', name: '', password: '' });
+    };
+
+    const deleteUser = async (id) => {
+        if (!window.confirm('Delete user?')) return;
+        try {
+            await fetch(`${API_URL}/users/${id}`, { method: 'DELETE' });
+            fetchUsers();
+        } catch (err) {
+            console.error('Error deleting user:', err);
         }
     };
 
     const createPost = async (e) => {
         e.preventDefault();
         try {
-            await fetch(`${API_URL}/posts`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    ...newPost,
-                    tags: newPost.tags.split(',').map(t => t.trim()),
-                }),
-            });
+            const payload = {
+                ...newPost,
+                tags: newPost.tags ? newPost.tags.split(',').map(t => t.trim()) : [],
+            };
+            if (editingPostId) {
+                // Update post
+                await fetch(`${API_URL}/posts/${editingPostId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                setEditingPostId(null);
+            } else {
+                // Create new post
+                await fetch(`${API_URL}/posts`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+            }
             setNewPost({ author_id: '', title: '', body: '', tags: '' });
             fetchPosts();
         } catch (err) {
-            console.error('Error creating post:', err);
+            console.error('Error creating/updating post:', err);
+        }
+    };
+
+    const editPost = (post) => {
+        setNewPost({ author_id: post.author_id, title: post.title, body: post.body, tags: (post.tags || []).join(', ') });
+        setEditingPostId(post._id);
+    };
+
+    const cancelEditPost = () => {
+        setEditingPostId(null);
+        setNewPost({ author_id: '', title: '', body: '', tags: '' });
+    };
+
+    const deletePost = async (id) => {
+        if (!window.confirm('Delete post?')) return;
+        try {
+            await fetch(`${API_URL}/posts/${id}`, { method: 'DELETE' });
+            fetchPosts();
+        } catch (err) {
+            console.error('Error deleting post:', err);
         }
     };
 
     return (
         <div className="App">
-            <header>
-                <h1>🌐 Polyglot Persistence Demo</h1>
-                <p>Demonstrating Postgres, MongoDB, Neo4j, TimescaleDB, and Redis</p>
-            </header>
+            <Header />
 
             <div className="container">
-                <section className="database-section">
-                    <h2>📊 PostgreSQL - Users</h2>
-                    <form onSubmit={createUser} className="form">
-                        <input
-                            type="email"
-                            placeholder="Email"
-                            value={newUser.email}
-                            onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
-                            required
-                        />
-                        <input
-                            type="text"
-                            placeholder="Name"
-                            value={newUser.name}
-                            onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
-                            required
-                        />
-                        <input
-                            type="password"
-                            placeholder="Password"
-                            value={newUser.password}
-                            onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
-                            required
-                        />
-                        <button type="submit">Create User</button>
-                    </form>
-                    <div className="data-list">
-                        {users.map((user) => (
-                            <div key={user.id} className="data-item">
-                                <strong>{user.name}</strong> ({user.email})
-                            </div>
-                        ))}
-                    </div>
-                </section>
+                <UserSection
+                    users={users}
+                    newUser={newUser}
+                    setNewUser={setNewUser}
+                    editingUserId={editingUserId}
+                    onCreateUser={createUser}
+                    onEditUser={editUser}
+                    onCancelEdit={cancelEditUser}
+                    onDeleteUser={deleteUser}
+                />
 
-                <section className="database-section">
-                    <h2>📄 MongoDB - Posts</h2>
-                    <form onSubmit={createPost} className="form">
-                        <input
-                            type="text"
-                            placeholder="Author ID (User ID)"
-                            value={newPost.author_id}
-                            onChange={(e) => setNewPost({ ...newPost, author_id: e.target.value })}
-                            required
-                        />
-                        <input
-                            type="text"
-                            placeholder="Title"
-                            value={newPost.title}
-                            onChange={(e) => setNewPost({ ...newPost, title: e.target.value })}
-                            required
-                        />
-                        <textarea
-                            placeholder="Body"
-                            value={newPost.body}
-                            onChange={(e) => setNewPost({ ...newPost, body: e.target.value })}
-                            required
-                        />
-                        <input
-                            type="text"
-                            placeholder="Tags (comma-separated)"
-                            value={newPost.tags}
-                            onChange={(e) => setNewPost({ ...newPost, tags: e.target.value })}
-                        />
-                        <button type="submit">Create Post</button>
-                    </form>
-                    <div className="data-list">
-                        {posts.map((post) => (
-                            <div key={post._id} className="data-item">
-                                <h3>{post.title}</h3>
-                                <p>{post.body}</p>
-                                <small>By: {post.author_id}</small>
-                            </div>
-                        ))}
-                    </div>
-                </section>
+                <PostSection
+                    users={users}
+                    posts={posts}
+                    newPost={newPost}
+                    setNewPost={setNewPost}
+                    editingPostId={editingPostId}
+                    onCreatePost={createPost}
+                    onEditPost={editPost}
+                    onCancelEdit={cancelEditPost}
+                    onDeletePost={deletePost}
+                />
 
-                <section className="database-section">
-                    <h2>🔗 Neo4j - Graph</h2>
-                    <p>User relationships and social graph visualization coming soon...</p>
-                </section>
+                <GraphSection users={users} />
 
-                <section className="database-section">
-                    <h2>⏱️ TimescaleDB - Events</h2>
-                    <p>Real-time analytics and time-series data coming soon...</p>
-                </section>
+                <AnalyticsSection />
 
-                <section className="database-section">
-                    <h2>⚡ Redis - Cache</h2>
-                    <p>Cache status and real-time performance metrics coming soon...</p>
-                </section>
+                <CacheSection />
             </div>
         </div>
     );
