@@ -6,6 +6,7 @@ import mongoose from 'mongoose';
 import neo4j from 'neo4j-driver';
 import { createClient } from 'redis';
 import { Kafka } from 'kafkajs';
+import { startKafkaConsumers } from './lib/kafka-consumers.js';
 
 dotenv.config();
 const app = express();
@@ -82,21 +83,15 @@ async function start() {
 
     async function connectKafka() {
       if (!process.env.KAFKA_BROKER) {
-        console.warn('KAFKA_BROKER not set; skipping Kafka connection');
+        console.warn('⚠️ KAFKA_BROKER not set; skipping Kafka connection');
         return;
       }
       await producer.connect();
       await consumer.connect();
-      await consumer.subscribe({ topic: 'db-changes', fromBeginning: true });
-
-      await consumer.run({
-        eachMessage: async ({ topic, partition, message }) => {
-          console.log({
-            value: message.value.toString(),
-          });
-        },
-      });
-      console.log('Connected to Kafka');
+      console.log('✅ Connected to Kafka');
+      
+      // Start consuming events from Kafka
+      await startKafkaConsumers(consumer, tsPool, redisClient, neo4jDriver);
     }
     await connectKafka().catch(err => console.error('Kafka error', err));
 

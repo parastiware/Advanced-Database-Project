@@ -1,5 +1,5 @@
 import express from 'express';
-import { asyncHandler, safeRunNeo4j, getNeo4jDriver } from '../lib/helpers.js';
+import { asyncHandler, safeRunNeo4j, getNeo4jDriver, getKafkaProducer } from '../lib/helpers.js';
 
 const router = express.Router();
 
@@ -22,6 +22,16 @@ router.post('/follow', asyncHandler(async (req, res) => {
     );
 
     if (result.records.length === 0) return res.status(404).json({ error: 'One or both users not found in Neo4j' });
+
+    // Publish event to Kafka
+    const producer = getKafkaProducer(req);
+    if (producer) {
+      try {
+        await producer.send({ topic: 'db-changes', messages: [{ value: JSON.stringify({ type: 'FOLLOW_CREATED', data: { followerId, followeeId } }) }] });
+      } catch (e) {
+        console.warn('Failed to publish FOLLOW_CREATED:', e.message);
+      }
+    }
 
     res.json({ status: 'success', followerId, followeeId, message: 'Relationship created successfully' });
   } finally {
