@@ -1700,7 +1700,7 @@ The foundation laid here provides a robust starting point for adding advanced fe
 
 **End of Report**
 
-*This report was generated for the Advanced Database Systems project demonstrating polyglot persistence architecture.*
+*This report was created for the Advanced Database Systems project demonstrating polyglot persistence architecture.*
 
 **Project Repository**: Advanced-Database-Project  
 **Report Generated**: December 8, 2025  
