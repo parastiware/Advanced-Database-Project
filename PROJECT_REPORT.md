@@ -4,9 +4,8 @@
 ---
 
 **Project Title:** Polyglot Persistence Demo with Microservices Architecture  
-**Author:** Advanced Database Systems Project  
-**Date:** December 8, 2025  
-**Version:** 1.1 - Updated with modular API architecture and vis-network visualization
+**Author:** Paras Tiwari
+
 
 ---
 
